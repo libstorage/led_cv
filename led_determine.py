@@ -68,6 +68,7 @@ def debug(msg):
     if DEBUG:
         print(msg)
 
+
 # Theory
 # - Take N samples as fast as we can
 # - Calculate the colors for each of the regions over the N samples
@@ -103,7 +104,8 @@ def find_non_black_average(img_data, r):
                 g_sum += g
                 b_sum += b
 
-    return (r_sum // pixel_samples, g_sum // pixel_samples, b_sum // pixel_samples)
+    return (r_sum // pixel_samples, g_sum // pixel_samples,
+            b_sum // pixel_samples)
 
 
 def find_intensity(img_data, r):
@@ -340,7 +342,8 @@ if __name__ == "__main__":
 
         output = dict(statekey=LEDState.y(), results=[])
         for i, v in enumerate(results):
-            output['results'].append(dict(wwn=slot_ids['slots'][i], state=v.value))
+            output['results'].append(
+                dict(wwn=slot_ids['slots'][i], state=v.value))
 
         print(yaml.dump(output, Dumper=yaml.Dumper))
         sys.exit(0)
