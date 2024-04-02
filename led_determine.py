@@ -9,6 +9,7 @@ import glob
 import socket
 import os
 import yaml
+import pathlib
 
 # The different LED regions in the mask, (Upper Left, Lower Right)
 # Note: These are a small region of the LED locations
@@ -23,6 +24,9 @@ DEBUG = bool(os.getenv("LED_DETERMINE_CV_DEBUG", ""))
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+FILE_PREFIX = "/tmp/led_determine_cv_"
+
 
 class LEDState(Enum):
     OFF = 1
@@ -140,7 +144,7 @@ def region_intensity(img_data):
 
 
 def acquire_image(device):
-    image_name = "/tmp/" + time.strftime("%Y%m%d-%H%M%S") + ".jpg"
+    image_name = FILE_PREFIX + time.strftime("%Y%m%d-%H%M%S") + ".jpg"
 
     if "megadeth" in socket.gethostname():
         # local
@@ -295,6 +299,10 @@ def interpret(r):
     return rc
 
 
+def delete_captures():
+    for f in glob.glob(FILE_PREFIX + "*"):
+        pathlib.Path.unlink(f)
+
 
 if __name__ == "__main__":
 
@@ -327,12 +335,16 @@ if __name__ == "__main__":
         # the LEDs are doing steady color, or flashing.
         results = interpret(results)
 
+        if LEDState.UNKNOWN not in results:
+            delete_captures()
+
         output = dict(statekey=LEDState.y(), results=[])
         for i, v in enumerate(results):
             output['results'].append(dict(wwn=slot_ids['slots'][i], state=v.value))
 
         print(yaml.dump(output, Dumper=yaml.Dumper))
         sys.exit(0)
+
     elif sys.argv[1] == 'collect':
         # Loop collecting data and dump to stdout
         agv = sys.argv[2:6]
@@ -341,6 +353,8 @@ if __name__ == "__main__":
                 print(f"Invalid expected state for {v}")
 
         numbers = get_region_numbers(count=30)
+
+        delete_captures()
 
         for c in numbers:
             for i, v in enumerate(c):
