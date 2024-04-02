@@ -20,6 +20,8 @@ REGIONS = (REG_0, REG_1, REG_2, REG_3)
 
 DEBUG = bool(os.getenv("LED_DETERMINE_CV_DEBUG", ""))
 
+__location__ = os.path.realpath(
+    os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 class LEDState(Enum):
     OFF = 1
@@ -210,7 +212,7 @@ def led_state_mm(sample, on_threshold):
 
 
 def build_numbers():
-    with open("data.learn", "r") as FH:
+    with open(os.path.join(__location__, "data.learn"), "r") as FH:
         data = FH.readlines()
 
     db = [
