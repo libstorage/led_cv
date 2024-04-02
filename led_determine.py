@@ -44,7 +44,7 @@ class LED:
         return self._intensity
 
     def __str__(self):
-        return f"({self._rgb[0]},{self._rgb[1]},{self._rgb[2]}), {self._intensity}, {self._fn}"
+        return f"({self._rgb[0]}, {self._rgb[1]}, {self._rgb[2]}), {self._intensity}, {self._fn}"
 
     def fn(self):
         return self._fn
@@ -65,47 +65,46 @@ class LED:
 
 def find_non_black_average(img_data, r):
     """
-	Returns (R, G, B) average for region
-	:param img_data:
-	:param r: Region of img_data
-	:return: (R, G, B)
-	"""
+    Returns (R, G, B) average for region
+    :param img_data:
+    :param r: Region of img_data
+    :return: (R, G, B)
+    """
     r_sum = 0
     g_sum = 0
     b_sum = 0
-    samples = 0
+    pixel_samples = 0
 
     (upper_left, lower_right) = r
     for x in range(upper_left[0], lower_right[0]):
         for y in range(upper_left[1], lower_right[1]):
             b, g, r = img_data[y, x]
             if b != 0 or g != 0 or r != 0:
-                samples += 1
+                pixel_samples += 1
                 r_sum += r
                 g_sum += g
                 b_sum += b
 
-    return (r_sum // samples, g_sum // samples, b_sum // samples)
+    return (r_sum // pixel_samples, g_sum // pixel_samples, b_sum // pixel_samples)
 
 
 def find_intensity(img_data, r):
     """
-	Returns 0-255 representing intensity
-	:param img_data:
-	:param r: Region of img_data
-	:return: 0-255 intensity
-	"""
+    Returns 0-255 representing intensity
+    :param img_data:
+    :param r: Region of img_data
+    :return: 0-255 intensity
+    """
     intensity_sum = 0
-    samples = 0
+    pixed_samples = 0
 
     (upper_left, lower_right) = r
     for x in range(upper_left[0], lower_right[0]):
         for y in range(upper_left[1], lower_right[1]):
-            i = img_data[y, x]
-            intensity_sum += i
-            samples += 1
+            intensity_sum += img_data[y, x]
+            pixed_samples += 1
 
-    return (intensity_sum // samples)
+    return (intensity_sum // pixed_samples)
 
 
 def region_colors(img_data):
@@ -127,7 +126,6 @@ def region_intensity(img_data):
 
 
 def acquire_image(device):
-
     image_name = "/tmp/" + time.strftime("%Y%m%d-%H%M%S") + ".jpg"
 
     if "megadeth" in socket.gethostname():
@@ -148,50 +146,42 @@ def process_image(image_file):
     return cv2.imread(image_file)
 
 
-def get_region_numbers(files=None, count=10):
+def get_region_numbers(count=10):
+    region_numbers = []
 
-    samples = []
+    for _ in range(0, count):
+        fn = acquire_image("/dev/video0")
+        q = process_image(fn)
+        if INTERACTIVE:
+            cv2.imshow('Quantization', q)
 
-    if files is not None:
-        for f in files:
-            q_img = process_image(f)
-            rc = region_intensity(q_img)
-            rc.append(f)
-            samples.append(rc)
-    else:
-        for _ in range(0, count):
-            fn = acquire_image("/dev/video0")
-            q = process_image(fn)
-            if INTERACTIVE:
-                cv2.imshow('Quantization', q)
+        colors = region_colors(q)
+        intensity = region_intensity(q)
 
-            colors = region_colors(q)
-            intensity = region_intensity(q)
+        leds = []
+        for idx in range(len(colors)):
+            leds.append(LED(colors[idx], intensity[idx], fn))
 
-            leds = []
-            for i in range(len(colors)):
-                leds.append(LED(colors[i], intensity[i], fn))
+        region_numbers.append(leds)
 
-            samples.append(leds)
-
-    return samples
+    return region_numbers
 
 
-def min_max_calc(samples):
+def min_max_calc(led_samples):
     """
-	Returns a tuple of intensity (min, max)
-	:param samples:
-	:return:
-	"""
+    Returns a tuple of intensity (min, max)
+    :param led_samples:
+    :return:
+    """
 
-    print(f"samples = {samples}")
+    print(f"samples = {led_samples}")
     min_max = [255, 0]
 
-    for s in samples:
-        if s < min_max[0]:
-            min_max[0] = s
-        if s > min_max[1]:
-            min_max[1] = s
+    for ls in led_samples:
+        if ls < min_max[0]:
+            min_max[0] = ls
+        if ls > min_max[1]:
+            min_max[1] = ls
 
     print(f"min_max = {min_max}")
 
@@ -199,7 +189,6 @@ def min_max_calc(samples):
 
 
 def led_state_mm(sample, on_threshold):
-
     d = 10
 
     print(f"{sample} - {on_threshold}")
@@ -214,7 +203,6 @@ def led_state_mm(sample, on_threshold):
 
 
 def build_numbers():
-
     with open("data.learn", "r") as FH:
         data = FH.readlines()
 
@@ -227,9 +215,9 @@ def build_numbers():
 
     for line in data:
         ls = line.strip()
-        (t, region, i) = ls.split(",")
+        (t, region, it) = ls.split(",")
         region = int(region)
-        intensity = int(i)
+        intensity = int(it)
         db[region][t].append(intensity)
 
     rc = [
