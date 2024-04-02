@@ -161,8 +161,6 @@ def get_region_numbers(count=10):
     for _ in range(0, count):
         fn = acquire_image("/dev/video0")
         q = process_image(fn)
-        if INTERACTIVE:
-            cv2.imshow('Quantization', q)
 
         colors = region_colors(q)
         intensity = region_intensity(q)
@@ -292,7 +290,6 @@ def interpret(r):
     return rc
 
 
-INTERACTIVE = False
 USE_FILES = False
 
 if __name__ == "__main__":
