@@ -11,8 +11,22 @@ import os
 import yaml
 import pathlib
 
+# Theory
+# - Take N samples as fast as we can
+# - Calculate the intensity for each of the regions over the N samples.
+# - Using previous samples of known intensity states in each region, determine if a LED is illuminated or not.
+# - If illuminated, simply compare RED and GREEN RGB values of sample to determine color.
+# - Walk through all samples to see if the LED state is consistent or toggling on/off which indicates
+#   blinking.  If the LED is blinking == LOCATE enabled for that region
+#
+#   Steady Green == NORMAL
+#   Steady Pinkish/Red == FAILURE
+#   Blink Green == LOCATE
+#   Blink Pink == LOCATE & FAILURE
+
 # The different LED regions in the mask, (Upper Left, Lower Right)
 # Note: These are a small region of the LED locations
+# TODO: move this to the config.yaml
 REG_0 = ((463, 680), (464, 685))
 REG_1 = ((542, 706), (546, 710))
 REG_2 = ((682, 737), (688, 742))
@@ -20,6 +34,7 @@ REG_3 = ((1123, 748), (1129, 754))
 
 REGIONS = (REG_0, REG_1, REG_2, REG_3)
 
+# Define to dump out debug
 DEBUG = bool(os.getenv("LED_DETERMINE_CV_DEBUG", ""))
 
 __location__ = os.path.realpath(
@@ -67,19 +82,6 @@ class LED:
 def debug(msg):
     if DEBUG:
         print(msg)
-
-
-# Theory
-# - Take N samples as fast as we can
-# - Calculate the colors for each of the regions over the N samples
-# - See if there is any significant change in each of the regions from sample to sample, where the
-#   sample turns into similar value of RGB to indicate a gray, indicates the LED is off, thus
-#   blinking.  If the LED is blinking == LOCATE enabled for that region
-#
-#   Steady Green == NORMAL
-#   Steady Pinkish == FAILURE
-#   Blink Green == LOCATE
-#   Blink Pink == LOCATE & FAILURE
 
 
 def find_non_black_average(img_data, r):
