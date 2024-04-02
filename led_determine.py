@@ -1,22 +1,15 @@
 #!/usr/bin/python3
 
 import cv2
-import numpy as np
 import subprocess
 import time
 from enum import Enum
-import os
 import sys
 import glob
 import socket
 
 # The different LED regions in the mask, (Upper Left, Lower Right)
-#REG_0 = ((460, 677), (465, 687))
-#REG_1 = ((540, 701), (547, 714))
-#REG_2 = ((679, 732), (693, 747))
-#REG_3 = ((1116, 738), (1136, 757))
-
-# Smaller regions
+# Note: These are a small region of the LED locations
 REG_0 = ((463, 680), (464, 685))
 REG_1 = ((542, 706), (546, 710))
 REG_2 = ((682, 737), (688, 742))
@@ -34,7 +27,28 @@ class LEDState(Enum):
     UNKNOWN = 6
 
 
-MASK = "mask.png"
+class LED:
+
+    def __init__(self, rgb, intensity, fn):
+        self._rgb = rgb
+        self._intensity = intensity
+        self._fn = fn
+
+    def is_red(self):
+        return self._rgb[0] > self._rgb[1]
+
+    def is_green(self):
+        return self._rgb[1] > self._rgb[0]
+
+    def intensity(self):
+        return self._intensity
+
+    def __str__(self):
+        return f"({self._rgb[0]},{self._rgb[1]},{self._rgb[2]}), {self._intensity}, {self._fn}"
+
+    def fn(self):
+        return self._fn
+
 
 # Theory
 # - Take N samples as fast as we can
@@ -74,6 +88,26 @@ def find_non_black_average(img_data, r):
     return (r_sum // samples, g_sum // samples, b_sum // samples)
 
 
+def find_intensity(img_data, r):
+    """
+	Returns 0-255 representing intensity
+	:param img_data:
+	:param r: Region of img_data
+	:return: 0-255 intensity
+	"""
+    intensity_sum = 0
+    samples = 0
+
+    (upper_left, lower_right) = r
+    for x in range(upper_left[0], lower_right[0]):
+        for y in range(upper_left[1], lower_right[1]):
+            i = img_data[y, x]
+            intensity_sum += i
+            samples += 1
+
+    return (intensity_sum // samples)
+
+
 def region_colors(img_data):
     rc = []
 
@@ -82,7 +116,17 @@ def region_colors(img_data):
     return rc
 
 
-def acquire_image(device, mask_img):
+def region_intensity(img_data):
+    rc = []
+
+    gray_scale = cv2.cvtColor(img_data, cv2.COLOR_BGR2GRAY)
+
+    for r in REGIONS:
+        rc.append(find_intensity(gray_scale, r))
+    return rc
+
+
+def acquire_image(device):
 
     image_name = "/tmp/" + time.strftime("%Y%m%d-%H%M%S") + ".jpg"
 
@@ -100,60 +144,8 @@ def acquire_image(device, mask_img):
     return image_name
 
 
-def quantization(img, n_colors=5):
-    # https://docs.opencv.org/4.x/d1/d5c/tutorial_py_kmeans_opencv.html
-    pixels = np.float32(img.reshape(-1, 3))
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-
-    ret, label, center = cv2.kmeans(pixels, n_colors, None, criteria, 10,
-                                    cv2.KMEANS_RANDOM_CENTERS)
-    center = np.uint8(center)
-    f = label.flatten()
-    res = center[f]
-    return res.reshape((img.shape))
-
-
-def process_image(image_file, mask_img=MASK, n_colors=5):
-    org = cv2.imread(image_file)
-    mask = cv2.imread(mask_img)
-    img = cv2.bitwise_and(org, mask)
-    #return quantization(img, n_colors)
-    return img
-
-
-def max_diff(sample):
-    s = list(sample)
-    s.sort()
-    return abs(s[0] - s[2])
-
-
-def led_state(sample):
-    # This is very fragile and prone to error and depends on ambient light etc.
-    # red, green, blue, +- range, name
-    red = (242, 157, 190, 30, LEDState.FAULT)
-    green = (104, 225, 151, 30, LEDState.NORM)
-
-    states = [red, green]
-
-    for s in states:
-        state_chk = s[4]
-        r = s[3]
-        found = True
-
-        for i in range(3):
-            low = max(0, s[i] - r)
-            hi = s[i] + r
-            if sample[i] not in range(low, hi):
-                found = False
-                break
-
-        if found:
-            return state_chk
-
-    if max_diff(sample) <= 25:
-        return LEDState.OFF
-
-    return LEDState.UNKNOWN
+def process_image(image_file):
+    return cv2.imread(image_file)
 
 
 def get_region_numbers(files=None, count=10):
@@ -163,113 +155,65 @@ def get_region_numbers(files=None, count=10):
     if files is not None:
         for f in files:
             q_img = process_image(f)
-            rc = region_colors(q_img)
+            rc = region_intensity(q_img)
             rc.append(f)
             samples.append(rc)
     else:
         for _ in range(0, count):
-            fn = acquire_image("/dev/video0", "mask.png")
+            fn = acquire_image("/dev/video0")
             q = process_image(fn)
             if INTERACTIVE:
                 cv2.imshow('Quantization', q)
 
             colors = region_colors(q)
-            colors.append(fn)
-            samples.append(colors)
+            intensity = region_intensity(q)
 
-    return samples
+            leds = []
+            for i in range(len(colors)):
+                leds.append(LED(colors[i], intensity[i], fn))
 
+            samples.append(leds)
 
-def get_samples(n=10):
-    global INTERACTIVE
-
-    samples = []
-
-    for _ in range(0, n):
-        (aoi, fn) = acquire_image("/dev/video0", "mask.png")
-        if INTERACTIVE:
-            cv2.imshow("Image and Mask", aoi)
-        q = quantization(aoi)
-        if INTERACTIVE:
-            cv2.imshow('Quantization', q)
-
-        rc = region_colors(q)
-
-        if INTERACTIVE:
-            print(f"{rc}")
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-
-        samples.append((led_state(rc[0]), led_state(rc[1]), led_state(rc[2]),
-                        led_state(rc[3]), fn))
     return samples
 
 
 def min_max_calc(samples):
     """
-	Returns a tuple of min/max values for r, g, b
+	Returns a tuple of intensity (min, max)
 	:param samples:
 	:return:
 	"""
-    min_max = [[255, 0], [255, 0], [255, 0]]
+
+    print(f"samples = {samples}")
+    min_max = [255, 0]
 
     for s in samples:
-        if s[0] < min_max[0][0]:
-            min_max[0][0] = s[0]
-        if s[0] > min_max[0][1]:
-            min_max[0][1] = s[0]
+        if s < min_max[0]:
+            min_max[0] = s
+        if s > min_max[1]:
+            min_max[1] = s
 
-        if s[1] < min_max[1][0]:
-            min_max[1][0] = s[1]
-        if s[1] > min_max[1][1]:
-            min_max[1][1] = s[1]
-
-        if s[2] < min_max[2][0]:
-            min_max[2][0] = s[2]
-        if s[2] > min_max[2][1]:
-            min_max[2][1] = s[2]
-
-    #print(f"min_max = {min_max}")
+    print(f"min_max = {min_max}")
 
     return min_max
 
 
-def led_state_mm(sample, r, g):
+def led_state_mm(sample, on_threshold):
 
-    # Some delta +- to account for some randomness in data
-    # The problem is that the "R" and "G" ranges in some
-    # cases overlap.  Thus when we fall into the bucket of
-    # norm or fault, we do a simple check to see if R > G
-    # and R < G and use that to determine the state.
-    #
-    # In testing this code seems to work, but could
-    # it simplified?
     d = 10
 
+    print(f"{sample} - {on_threshold}")
 
-    if sample[0] in range(g[0][0]-d, g[0][1]+d) and \
-     sample[1] in range(g[1][0]-d, g[1][1]+d) and \
-     sample[2] in range(g[2][0]-d, g[2][1]+d):
-
-        if sample[0] > sample[1]:
+    if sample.intensity() >= (on_threshold - d):
+        if sample.is_red():
             return LEDState.FAULT
-
-        return LEDState.NORM
-    elif sample[0] in range(r[0][0]-d, r[0][1]+d) and \
-     sample[1] in range(r[1][0]-d, r[1][1]+d) and \
-     sample[2] in range(r[2][0]-d, r[2][1]+d):
-
-        if sample[0] < sample[1]:
+        else:
             return LEDState.NORM
-
-        return LEDState.FAULT
     else:
-        if max_diff(sample) <= 25:
-            return LEDState.OFF
-        return None
+        return LEDState.OFF
 
 
-def build_rgb_ranges():
+def build_numbers():
 
     with open("data.learn", "r") as FH:
         data = FH.readlines()
@@ -283,10 +227,10 @@ def build_rgb_ranges():
 
     for line in data:
         ls = line.strip()
-        (t, region, r, g, b) = ls.split(",")
+        (t, region, i) = ls.split(",")
         region = int(region)
-        color = (int(r), int(g), int(b))
-        db[region][t].append(color)
+        intensity = int(i)
+        db[region][t].append(intensity)
 
     rc = [
         dict(R=[], G=[]),
@@ -302,7 +246,16 @@ def build_rgb_ranges():
     for i, v in enumerate(rc):
         print(f"Region[{i}]['R'] = {v['R']}")
         print(f"Region[{i}]['G'] = {v['G']}")
-    return rc
+
+    region_mins = []
+
+    for i, v in enumerate(rc):
+        r_min = v['R'][0]
+        g_min = v['G'][0]
+        region_mins.append(min(r_min, g_min))
+
+    print(f"Region mins = {region_mins}")
+    return region_mins
 
 
 def observed(led_states):
@@ -354,24 +307,22 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if len(sys.argv) == 1:
-        # Open the file with rgb values for each of the regions with known settings and build the needed
-        # data to interpret the LED statuses.
-        mmr = build_rgb_ranges()
-
+        # Open the file with the intensity values for each of the regions with known settings
+        # and build the needed data to interpret the LED statuses.
+        mmr = build_numbers()
         samples = get_region_numbers(count=10)
 
         results = []
 
         for s in samples:
             sr = []
-            print(f"sample = {s}")
-            for i, v in enumerate(s[0:4]):
-                sr.append(led_state_mm(v, mmr[i]["R"], mmr[i]["G"]))
+            for i, v in enumerate(s):
+                sr.append(led_state_mm(v, mmr[i]))
             print(f"mm result = {sr}")
             results.append(sr)
 
-        # We have a list of states for each of the sample, we now need to determine what the LEDs are doing
-        # steady color, or flashing.
+        # We have a list of states for each of the sample, we now need to determine what
+        # the LEDs are doing steady color, or flashing.
         print(f"Best guess ... {interpret(results)}")
 
     elif sys.argv[1] == 'collect':
@@ -383,13 +334,13 @@ if __name__ == "__main__":
 
         if USE_FILES:
             files = glob.glob("*.jpg")
-            color_numbers = get_region_numbers(files)
+            numbers = get_region_numbers(files)
         else:
-            color_numbers = get_region_numbers(count=30)
+            numbers = get_region_numbers(count=3)
 
-        for c in color_numbers:
-            for i, v in enumerate(c[0:4]):
-                print(f"{agv[i]}, {i}, {v[0]}, {v[1]}, {v[2]}")
+        for c in numbers:
+            for i, v in enumerate(c):
+                print(f"{agv[i]}, {i}, {v.intensity()}")
     else:
         print(f"Invalid option {sys.argv[1]}")
         sys.exit(2)
