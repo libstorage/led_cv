@@ -8,6 +8,7 @@ import sys
 import glob
 import socket
 import os
+import yaml
 
 # The different LED regions in the mask, (Upper Left, Lower Right)
 # Note: These are a small region of the LED locations
@@ -30,6 +31,10 @@ class LEDState(Enum):
     FAULT = 4
     LOCATE_FAULT = 5
     UNKNOWN = 6
+
+    @staticmethod
+    def y():
+        return "{OFF: 1, NORM: 2, LOCATE: 3, FAULT: 4, LOCATE_FAULT: 5, UNKNOWN: 6}"
 
 
 class LED:
@@ -294,6 +299,10 @@ USE_FILES = False
 
 if __name__ == "__main__":
 
+    # File with wwn for each 'slot' we are monitoring via USB camera
+    with open(os.path.join(__location__, "config.yaml"), "r") as FH:
+        slot_ids = yaml.load(FH, Loader=yaml.Loader)
+
     if len(sys.argv) > 1 and len(sys.argv) != 6:
         print(
             f"syntax: {sys.argv[0]} collect [G|R][4], eg. led_determine.py collect G G G G"
@@ -317,8 +326,14 @@ if __name__ == "__main__":
 
         # We have a list of states for each of the sample, we now need to determine what
         # the LEDs are doing steady color, or flashing.
-        print(f"Best guess ... {interpret(results)}")
+        results = interpret(results)
 
+        output = dict(statekey=LEDState.y(), results=[])
+        for i, v in enumerate(results):
+            output['results'].append(dict(wwn=slot_ids['slots'][i], state=v.value))
+
+        print(yaml.dump(output, Dumper=yaml.Dumper))
+        sys.exit(0)
     elif sys.argv[1] == 'collect':
         # Loop collecting data and dump to stdout
         agv = sys.argv[2:6]

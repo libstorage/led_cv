@@ -1,0 +1,2 @@
+# LED slot configuration for camera, wwn for each of the LED regions
+slots: [50014ee26049cc9d, 50014ee20aeb1530, 50014ee20ae9bafa, 50014ee2b59fb711]
