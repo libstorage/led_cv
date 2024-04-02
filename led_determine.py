@@ -359,6 +359,7 @@ if __name__ == "__main__":
         for c in numbers:
             for i, v in enumerate(c):
                 print(f"{agv[i]}, {i}, {v.intensity()}")
+        sys.exit(0)
     else:
         print(f"Invalid option {sys.argv[1]}")
         sys.exit(2)
