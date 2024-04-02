@@ -7,6 +7,7 @@ from enum import Enum
 import sys
 import glob
 import socket
+import os
 
 # The different LED regions in the mask, (Upper Left, Lower Right)
 # Note: These are a small region of the LED locations
@@ -16,6 +17,8 @@ REG_2 = ((682, 737), (688, 742))
 REG_3 = ((1123, 748), (1129, 754))
 
 REGIONS = (REG_0, REG_1, REG_2, REG_3)
+
+DEBUG = bool(os.getenv("LED_DETERMINE_CV_DEBUG", ""))
 
 
 class LEDState(Enum):
@@ -49,6 +52,10 @@ class LED:
     def fn(self):
         return self._fn
 
+
+def debug(msg):
+    if DEBUG:
+        print(msg)
 
 # Theory
 # - Take N samples as fast as we can
@@ -174,7 +181,7 @@ def min_max_calc(led_samples):
     :return:
     """
 
-    print(f"samples = {led_samples}")
+    debug(f"samples = {led_samples}")
     min_max = [255, 0]
 
     for ls in led_samples:
@@ -183,7 +190,7 @@ def min_max_calc(led_samples):
         if ls > min_max[1]:
             min_max[1] = ls
 
-    print(f"min_max = {min_max}")
+    debug(f"min_max = {min_max}")
 
     return min_max
 
@@ -191,7 +198,7 @@ def min_max_calc(led_samples):
 def led_state_mm(sample, on_threshold):
     d = 10
 
-    print(f"{sample} - {on_threshold}")
+    debug(f"{sample} - {on_threshold}")
 
     if sample.intensity() >= (on_threshold - d):
         if sample.is_red():
@@ -232,8 +239,8 @@ def build_numbers():
         rc[r]["R"] = min_max_calc(db[r]["R"])
 
     for i, v in enumerate(rc):
-        print(f"Region[{i}]['R'] = {v['R']}")
-        print(f"Region[{i}]['G'] = {v['G']}")
+        debug(f"Region[{i}]['R'] = {v['R']}")
+        debug(f"Region[{i}]['G'] = {v['G']}")
 
     region_mins = []
 
@@ -242,7 +249,7 @@ def build_numbers():
         g_min = v['G'][0]
         region_mins.append(min(r_min, g_min))
 
-    print(f"Region mins = {region_mins}")
+    debug(f"Region mins = {region_mins}")
     return region_mins
 
 
@@ -306,7 +313,7 @@ if __name__ == "__main__":
             sr = []
             for i, v in enumerate(s):
                 sr.append(led_state_mm(v, mmr[i]))
-            print(f"mm result = {sr}")
+            debug(f"mm result = {sr}")
             results.append(sr)
 
         # We have a list of states for each of the sample, we now need to determine what
