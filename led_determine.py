@@ -295,7 +295,6 @@ def interpret(r):
     return rc
 
 
-USE_FILES = False
 
 if __name__ == "__main__":
 
@@ -341,11 +340,7 @@ if __name__ == "__main__":
             if v not in ["G", "R"]:
                 print(f"Invalid expected state for {v}")
 
-        if USE_FILES:
-            files = glob.glob("*.jpg")
-            numbers = get_region_numbers(files)
-        else:
-            numbers = get_region_numbers(count=3)
+        numbers = get_region_numbers(count=30)
 
         for c in numbers:
             for i, v in enumerate(c):
