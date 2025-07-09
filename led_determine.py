@@ -29,10 +29,10 @@ import pathlib
 # The different LED regions in the mask, (Upper Left, Lower Right)
 # Note: These are a small region of the LED locations
 # TODO: move this to the config.yaml
-REG_0 = ((608, 206), (610, 209))
-REG_1 = ((679, 315), (685, 319))
-REG_2 = ((810, 504), (818, 513))
-REG_3 = ((1118, 827), (1124, 831))
+REG_0 = ((601, 212), (604, 215))
+REG_1 = ((673, 322), (677, 326))
+REG_2 = ((809, 515), (814, 520))
+REG_3 = ((1120, 830), (1124, 833))
 
 REGIONS = (REG_0, REG_1, REG_2, REG_3)
 
@@ -104,9 +104,9 @@ def find_non_black_average(img_data, r):
             b, g, r = img_data[y, x]
             if b != 0 or g != 0 or r != 0:
                 pixel_samples += 1
-                r_sum += r
-                g_sum += g
-                b_sum += b
+                r_sum += int(r)
+                g_sum += int(g)
+                b_sum += int(b)
 
     return (r_sum // pixel_samples, g_sum // pixel_samples,
             b_sum // pixel_samples)
@@ -119,13 +119,13 @@ def find_intensity(img_data, r):
     :param r: Region of img_data
     :return: 0-255 intensity
     """
-    intensity_sum = 0
-    pixed_samples = 0
+    intensity_sum = int(0)
+    pixed_samples = int(0)
 
     (upper_left, lower_right) = r
     for x in range(upper_left[0], lower_right[0]):
         for y in range(upper_left[1], lower_right[1]):
-            intensity_sum += img_data[y, x]
+            intensity_sum += int(img_data[y, x])
             pixed_samples += 1
 
     return (intensity_sum // pixed_samples)
@@ -307,7 +307,7 @@ def interpret(r):
 
 def delete_captures():
     for f in glob.glob(FILE_PREFIX + "*"):
-        pathlib.Path.unlink(f)
+        pathlib.Path(f).unlink()
 
 
 if __name__ == "__main__":
@@ -342,9 +342,13 @@ if __name__ == "__main__":
         results = interpret(results)
 
         if LEDState.UNKNOWN not in results:
-            delete_captures()
+            pass
+            #delete_captures()
 
-        output = dict(statekey=LEDState.y(), results=[])
+        output = {
+            'statekey': LEDState.y(),
+            'results': []
+        }
         for i, v in enumerate(results):
             output['results'].append(
                 dict(wwn=slot_ids['slots'][i], state=v.value))
