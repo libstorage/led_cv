@@ -29,10 +29,10 @@ import pathlib
 # The different LED regions in the mask, (Upper Left, Lower Right)
 # Note: These are a small region of the LED locations
 # TODO: move this to the config.yaml
-REG_0 = ((601, 212), (604, 215))
+REG_0 = ((601, 211), (604, 215))
 REG_1 = ((673, 322), (677, 326))
 REG_2 = ((809, 515), (814, 520))
-REG_3 = ((1120, 830), (1124, 833))
+REG_3 = ((1124, 826), (1129, 827))
 
 REGIONS = (REG_0, REG_1, REG_2, REG_3)
 
