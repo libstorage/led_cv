@@ -29,9 +29,7 @@ determine what is going on.  See source code for all the details.
 
 ## What to do when the camera gets moved
 
-1. Collect an updated image, figure out what LEDs you have access too and update the `REG_0 - REG_N` variables
-2. Update `data.learn`, which is done by the following
-   * Manually set all the LEDs of interest to normal, then run `./led_determine.py collect G G G G > data.learn`
-   * Manually set all the LEDs of interest to failure, then run `./led_determine.py collect R R R R >> data.learn`
-3. Test it
-4. Update the `config.yaml` to ensure that each LED has the correct WWN
+1. Collect an updated image, figure out what LEDs you have access too and update the `REG_0 - REG_N`
+   variables for regions of interest
+2. Test it
+3. Update the `config.yaml` to ensure that each LED has the correct WWN
